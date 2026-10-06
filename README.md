@@ -1,44 +1,46 @@
-# Bilibili Web 音频模式（Chrome 扩展）
+# 哔哩哔哩音频模式 · Tampermonkey
 
-> 基于 [Ashish-Bansal/audio-only-youtube: Listen to only audio on youtube.](https://github.com/Ashish-Bansal/audio-only-youtube)
+只听音频，不显示视频画面。音频模式**默认关闭**，开启后会按视频记住设置；同一视频的不同分集（如 `?p=2`）共用设置。BV 链接和旧版 av 链接分别保存设置。
 
-安装: [Audio Only bilibili - Chrome 网上应用店](https://chrome.google.com/webstore/detail/audio-only-bilibili/ckdhkbociihkjomnnmobadacinmehjfc?hl=zh-CN)
+## 安装与使用
 
-=======================================
+1. 在浏览器中安装 Tampermonkey（篡改猴）。
+2. 新建脚本，将 [userscript/audio-only-bilibili.user.js](userscript/audio-only-bilibili.user.js) 的完整内容粘贴进去并保存。
+3. 打开哔哩哔哩普通视频页面（`/video/BV…` 或 `/video/av…`），开启浮动按钮中的「音频模式」开关。
+4. 视频画面会隐藏，音频控制保留在右下角的浮动卡片中。通过卡片控制播放，也可以点击箭头收起控制栏。关闭音频模式后，视频播放器会恢复，并跳转到当前音频播放位置。选集和合集区域保留，可以正常点击切换视频。
+5. 在音频控制栏中选择「播放一次」或「单曲循环」。默认播放一次，结束后停止；单曲循环会从头重复播放当前音频。播放方式是全局设置，应用到所有视频的音频模式，刷新或再次打开时自动恢复。音频模式开关仍按视频记忆。此设置不改变原生视频播放器的循环设置。
 
-好处：
-- 节省带宽（视频数据部分）
-- 节省视频解码、渲染的系统资源开销
+刷新页面或重启浏览器后，设置仍会保留。如果安装了原版扩展，请先停用，避免干扰播放。音频获取失败时，可以关闭后重新开启以重试。
 
-使用：
-- 点击扩展图标切换模式
+界面统一使用中文。浏览器自带的音频控件文字由浏览器语言决定。控件支持浅色和深色外观，优先跟随 Dark Reader 的主题，其次跟随网站主题属性或系统设置。控件样式与网页隔离，并使用 [Dark Reader 样式管理器](https://github.com/darkreader/darkreader/blob/main/src/inject/dynamic-theme/style-manager.ts) 识别的样式排除机制，避免在动态模式下重复转换颜色。Dark Reader 的其他模式尚未验证。
 
-效果:
+## 实现原理
 
-![效果](https://pic3.zhimg.com/80/v2-a62fb0dd18360c753d1b03f9a7abee6a_720w.jpg)
+原版扩展通过 Chrome 的 `webRequest` 接口监听音频请求，将音频地址赋给视频元素。它使用全局开关，默认开启，切换时会刷新页面。
 
-## 手动安装
+此脚本通过 `GM_xmlhttpRequest` 请求哔哩哔哩接口，获取分集信息和 DASH 音频地址。开启后，脚本暂停并隐藏原生播放器，阻止其视频继续播放，再使用独立的 HTML 音频元素播放。切换时保留播放位置、音量、静音、倍速及播放或暂停状态。
 
-1. 下载：[Releases · cyio/audio-only-bilibili](https://github.com/cyio/audio-only-bilibili/releases)
-2. 打开：`chrome://extensions`，将下载包拖入安装
+切换视频或分集时，脚本会取消尚未完成的请求，并应用目标视频的设置。关闭音频模式、离开当前视频或遇到音频错误时，会恢复被隐藏的播放器。隐藏范围仅限播放器区域，不隐藏可能包含选集的 `#playerWrap`，也不向网站的组件树插入音频控件。带签名的音频地址每次重新获取，不会持久保存。
 
-## 贡献
+## 使用限制
 
-1. After cloning the repo,  run `npm run dev`.
-2. Open chrome, go to extensions tab, load unpacked extension and select
-   `build/dev` directory.
-3. Go to bilibili and see extension in live.
+原生播放器仍可能缓冲视频或完成已发出的请求，因此**不能保证完全不下载视频数据**。
 
-In case you edit code, it would automatically rebuild the extension and after
-that you need to reload it in the browser.
+目前不支持自动切换播放列表、弹幕同步和原生播放器快捷键，也不支持番剧、直播、非 DASH 媒体及受限视频。浏览器的自动播放限制可能要求手动点击播放。
 
-## 原理
+## 源码与许可证
 
-一般主流视频网站都支持视频、音频流分离，扩展获取到音频流地址，设置给`<video>`
+完整源码仓库：**https://github.com/zpatronus/audio-only-bilibili-tampermonkey**。
 
-技术点：
-- 是否屏蔽视频数据流
-   - 屏蔽，网站会产生不断重试请求，显著消耗资源
-      - 实现需要 api：`declarativeNetRequest`
-   - 不屏蔽，只请求开头一小段视频数据，后续只请求音频数据
-      - 过滤出音频数据：`webRequest.onBeforeRequest`
+本项目继续采用 **GNU GPL 第 3 版**，原始 [LICENSE](LICENSE) 保持不变。`.user.js` 文件即完整、未压缩的用户脚本源码，不需要构建，也不包含打包依赖。分发副本或修改版本时，请附上对应源码和许可证，并保留署名及修改说明。
+
+上游项目与署名：
+
+- [cyio/audio-only-bilibili](https://github.com/cyio/audio-only-bilibili)：原版哔哩哔哩扩展及音视频分离播放思路。
+- [Ashish-Bansal/audio-only-youtube](https://github.com/Ashish-Bansal/audio-only-youtube)：原版扩展所注明的上游项目。
+
+2026-10-06 修改：将扩展改为独立的 Tampermonkey 脚本，增加默认关闭、按视频记忆、接口获取音频、中文界面、主题适配及独立播放控制；开启时以音频卡片替代视频画面。旧扩展代码及构建工具已移除。
+
+## 验证情况
+
+开发期间已通过语法检查，以及设置记忆、播放切换和导航请求取消的自动化检查。无头 Chrome 测试页面还验证了精简布局、主题变化、控制栏折叠、视频画面的隐藏与恢复，以及选集保留、点击切换后的设置应用和网站组件子节点保持不变。尚未在真实哔哩哔哩页面及实际安装的 Dark Reader 扩展中验证。使用此脚本不需要包管理器或构建工具。
